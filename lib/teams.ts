@@ -40,10 +40,13 @@ export const teamsDatabase: Record<string, string[]> = {
     "Isco",
     "Raphael Varane",
     "Mateo Kovacic",
-    "Alvaro Morata"
+    "Alvaro Morata",
+    "Samuel Eto'o"
   ],
   "Barcelona": [
+    "Diego Maradona",
     "Lionel Messi",
+    "Luis Figo",
     "Xavi",
     "Andrés Iniesta",
     "Ronaldinho",
@@ -171,7 +174,7 @@ export const teamsDatabase: Record<string, string[]> = {
   ],
   "AC Milan": [
     "Paolo Maldini",
-    "Kaka",
+    "Kaká",
     "Andriy Shevchenko",
     "Andrea Pirlo",
     "Clarence Seedorf",
@@ -415,6 +418,7 @@ export const teamsDatabase: Record<string, string[]> = {
     "Ivan Cordoba"
   ],
   "Boca Juniors": [
+    "Diego Maradona",
     "Juan Román Riquelme",
     "Martín Palermo",
     "Carlos Tevez",
@@ -637,6 +641,7 @@ export const teamsDatabase: Record<string, string[]> = {
     "Jan Koller"
   ],
   "Napoli": [
+    "Diego Maradona",
     "Marek Hamsik",
     "Dries Mertens",
     "Lorenzo Insigne",
@@ -874,6 +879,7 @@ export const teamsDatabase: Record<string, string[]> = {
   ],
   "Palmeiras": [
     "Marcos",
+    "Cafu",
     "Edmundo",
     "Roberto Carlos",
     "Rivaldo",
@@ -1407,6 +1413,7 @@ export const teamsDatabase: Record<string, string[]> = {
     "Tomas Ujfalusi"
   ],
   "Sevilla": [
+    "Diego Maradona",
     "Jesus Navas",
     "Dani Alves",
     "Sergio Ramos",

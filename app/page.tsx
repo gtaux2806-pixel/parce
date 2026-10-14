@@ -4,6 +4,7 @@ import { useState, useEffect, KeyboardEvent, useRef, useMemo } from "react";
 import confetti from "canvas-confetti";
 import { teamsDatabase } from "../lib/teams";
 import { teamsLogos } from "../lib/teamslogos";
+import { playerImages } from "../lib/playerimages";
 
 type Player = "X" | "O";
 
@@ -31,6 +32,14 @@ const normalizeString = (str: string) => {
     .trim();
 };
 
+const getInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
 export default function Home() {
   const [colTeams, setColTeams] = useState<string[]>([]);
   const [rowTeams, setRowTeams] = useState<string[]>([]);
@@ -46,6 +55,8 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(90);
   const [timerActive, setTimerActive] = useState(false);
   const [showRestartModal, setShowRestartModal] = useState(false);
+  const [showTurnIndicator, setShowTurnIndicator] = useState(false);
+  const [showClearScoresModal, setShowClearScoresModal] = useState(false);
 
   const [scores, setScores] = useState({ X: 0, O: 0 });
 
@@ -80,6 +91,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!winner && hasGameStarted) {
+      setShowTurnIndicator(true);
+      const t = setTimeout(() => setShowTurnIndicator(false), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [currentPlayer, winner, hasGameStarted]);
+
+  useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasGameStarted) {
         e.preventDefault();
@@ -104,7 +123,11 @@ export default function Home() {
 
   useEffect(() => {
     setTimeLeft(90);
-    setTimerActive(false);
+    if (!winner) {
+      setTimerActive(true);
+    } else {
+      setTimerActive(false);
+    }
   }, [currentPlayer, winner]);
 
   useEffect(() => {
@@ -227,24 +250,24 @@ export default function Home() {
     setPendingSelection(null);
     setSuggestions([]);
     setTimeLeft(90);
-    setTimerActive(false);
+    setTimerActive(true);
     confetti.reset();
   };
 
   const checkWin = (currentBoard: CellData[][]): WinData | null => {
     for (let i = 0; i < 3; i++) {
       if (currentBoard[i][0].owner && currentBoard[i][0].owner === currentBoard[i][1].owner && currentBoard[i][1].owner === currentBoard[i][2].owner) {
-        return { player: currentBoard[i][0].owner, line: [[i, 0], [i, 1], [i, 2]] };
+        return { player: currentBoard[i][0].owner as Player, line: [[i, 0], [i, 1], [i, 2]] };
       }
       if (currentBoard[0][i].owner && currentBoard[0][i].owner === currentBoard[1][i].owner && currentBoard[1][i].owner === currentBoard[2][i].owner) {
-        return { player: currentBoard[0][i].owner, line: [[0, i], [1, i], [2, i]] };
+        return { player: currentBoard[0][i].owner as Player, line: [[0, i], [1, i], [2, i]] };
       }
     }
     if (currentBoard[0][0].owner && currentBoard[0][0].owner === currentBoard[1][1].owner && currentBoard[1][1].owner === currentBoard[2][2].owner) {
-      return { player: currentBoard[0][0].owner, line: [[0, 0], [1, 1], [2, 2]] };
+      return { player: currentBoard[0][0].owner as Player, line: [[0, 0], [1, 1], [2, 2]] };
     }
     if (currentBoard[0][2].owner && currentBoard[0][2].owner === currentBoard[1][1].owner && currentBoard[1][1].owner === currentBoard[2][0].owner) {
-      return { player: currentBoard[0][2].owner, line: [[0, 2], [1, 1], [2, 0]] };
+      return { player: currentBoard[0][2].owner as Player, line: [[0, 2], [1, 1], [2, 0]] };
     }
     
     const isDraw = currentBoard.every(row => row.every(cell => cell.owner !== null));
@@ -342,76 +365,80 @@ export default function Home() {
       <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none z-0" />
 
       {/* Fixed Header */}
-      <div className="fixed top-0 left-0 z-40 w-full bg-slate-950/90 backdrop-blur-lg pt-6 pb-4 border-b border-slate-800/80 flex flex-col items-center shadow-2xl">
-        <h1 className="text-4xl md:text-5xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-blue-400 tracking-tight text-center drop-shadow-lg">
-          Grid de Leyendas
-        </h1>
-        <p className="text-slate-400 text-sm md:text-base font-medium tracking-wide text-center">
-          Busca un jugador que conecte los equipos
-        </p>
-      </div>
+      <header className="fixed top-0 left-0 z-40 w-full bg-slate-950/90 backdrop-blur-lg py-3 px-4 sm:px-6 border-b border-slate-800/80 shadow-2xl flex items-center justify-between">
+        {/* Left: Logo */}
+        <div className="flex-1 flex justify-start">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-blue-400 tracking-tight drop-shadow-lg truncate">
+            Grid de Leyendas
+          </h1>
+        </div>
 
-      <div className="z-10 flex flex-col items-center w-full max-w-5xl mt-36 px-4">
-        {/* Scoreboard / Ranking */}
-        <div className="mb-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 px-6 py-3 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-slate-800/80 shadow-xl transition-all duration-300">
+        {/* Center: Scoreboard */}
+        <div className="hidden md:flex flex-1 justify-center items-center gap-3 lg:gap-4 px-3 lg:px-4 py-1.5 rounded-full bg-slate-900/60 border border-slate-800/80 shadow-inner max-w-fit">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">Marcador:</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-black text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.3)]">X</span>
-              <span className="text-xl font-extrabold text-slate-100">{scores.X}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-black text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.3)]">X</span>
+              <span className="text-lg font-extrabold text-slate-100">{scores.X}</span>
             </div>
-            <div className="h-6 w-[1px] bg-slate-800" />
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-black text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">O</span>
-              <span className="text-xl font-extrabold text-slate-100">{scores.O}</span>
+            <div className="h-4 w-[1px] bg-slate-800" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-black text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">O</span>
+              <span className="text-lg font-extrabold text-slate-100">{scores.O}</span>
             </div>
           </div>
-
           {(scores.X > 0 || scores.O > 0) && (
             <>
-              <div className="h-6 w-[1px] bg-slate-800 hidden sm:block" />
-              <div className="flex items-center gap-3">
-                <div className="text-xs font-semibold text-amber-400 flex items-center gap-1 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
-                  👑 {scores.X > scores.O ? 'Líder: Jugador X' : scores.O > scores.X ? 'Líder: Jugador O' : 'Empate'}
-                </div>
-                <button
-                  onClick={() => {
-                    if (confirm('¿Deseas reiniciar las estadísticas del marcador?')) {
-                      setScores({ X: 0, O: 0 });
-                      localStorage.removeItem("grid-legends-scores");
-                    }
-                  }}
-                  title="Reiniciar marcador"
-                  className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800/80 rounded-lg transition-all duration-200"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+              <div className="h-4 w-[1px] bg-slate-800" />
+              <div className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 whitespace-nowrap">
+                👑 {scores.X > scores.O ? 'Líder X' : scores.O > scores.X ? 'Líder O' : 'Empate'}
               </div>
+              <button
+                onClick={() => setShowClearScoresModal(true)}
+                className="text-slate-500 hover:text-red-400 transition-colors ml-1 p-0.5 rounded-full hover:bg-slate-800"
+                title="Reiniciar marcador"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             </>
           )}
         </div>
 
-        <div className="mb-10 h-16 flex items-center justify-center">
-          {winner ? (
+        {/* Right: Auth placeholders */}
+        <div className="flex-1 flex justify-end items-center gap-2 sm:gap-4">
+          <button className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            Iniciar sesión
+          </button>
+          <button className="text-xs sm:text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 sm:px-4 py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]">
+            Registrarte
+          </button>
+        </div>
+      </header>
+
+      {/* Floating Tu Turno Indicator */}
+      {showTurnIndicator && !winner && (
+        <div className={`
+          fixed top-24 left-1/2 -translate-x-1/2 z-50
+          flex items-center gap-4 px-8 py-3 rounded-full backdrop-blur-xl border-2 shadow-2xl transition-all duration-300 animate-[bounce_0.5s_ease-out]
+          ${currentPlayer === 'X' 
+            ? 'bg-orange-600/90 border-orange-400 text-white shadow-[0_0_50px_rgba(249,115,22,0.6)]' 
+            : 'bg-blue-600/90 border-blue-400 text-white shadow-[0_0_50px_rgba(59,130,246,0.6)]'}
+        `}>
+          <span className="text-3xl font-black drop-shadow-md">{currentPlayer}</span>
+          <span className="text-lg uppercase tracking-widest font-black">TU TURNO</span>
+        </div>
+      )}
+
+      <div className="z-10 flex flex-col items-center w-full max-w-5xl mt-24 sm:mt-28 px-4">
+        
+        {winner && (
+          <div className="mb-6 h-12 flex items-center justify-center">
             <div className="text-3xl font-black bg-gradient-to-r from-amber-300 to-yellow-500 text-transparent bg-clip-text drop-shadow-md animate-bounce">
               {winner === "Draw" ? "¡Es un Empate!" : `¡Ganador: Jugador ${winner}!`}
             </div>
-          ) : (
-            <div className={`
-              flex items-center gap-4 px-10 py-4 rounded-3xl backdrop-blur-lg border-2 shadow-2xl transition-all duration-500 transform scale-110
-              ${currentPlayer === 'X' 
-                ? 'bg-orange-500/20 border-orange-500/80 text-orange-400 shadow-[0_0_40px_rgba(249,115,22,0.4)] animate-[pulse_2s_ease-in-out_infinite]' 
-                : 'bg-blue-500/20 border-blue-500/80 text-blue-400 shadow-[0_0_40px_rgba(59,130,246,0.4)] animate-[pulse_2s_ease-in-out_infinite]'}
-            `}>
-              <span className="text-3xl font-black drop-shadow-md">{currentPlayer}</span>
-              <span className="text-base uppercase tracking-widest font-black opacity-100">TU TURNO</span>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="w-full flex flex-col md:flex-row gap-10 items-center justify-center">
           
@@ -445,7 +472,7 @@ export default function Home() {
                     return (
                       <div
                         key={`cell-${rIdx}-${cIdx}`}
-                        onClick={() => isPendingHere && placePlayer(rIdx, cIdx, pendingSelection.displayPlayer)}
+                        onClick={() => isPendingHere && pendingSelection && placePlayer(rIdx, cIdx, pendingSelection.displayPlayer)}
                         className={`
                           relative flex flex-col items-center justify-center p-2 rounded-xl sm:rounded-2xl
                           transition-all duration-300 overflow-hidden aspect-square min-h-0 min-w-0
@@ -457,21 +484,77 @@ export default function Home() {
                         `}
                       >
                         {cell.owner && (
-                          <>
-                            <span className={`text-6xl sm:text-7xl md:text-8xl font-black absolute opacity-10 select-none pointer-events-none transform -translate-y-1 ${cell.owner === 'X' ? 'text-orange-400' : 'text-blue-400'}`}>
-                              {cell.owner}
-                            </span>
-                            <span className="z-10 text-[9px] min-[400px]:text-[11px] sm:text-xs md:text-sm font-extrabold text-center text-white break-words w-full px-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-tight">
+                          <div className="flex flex-col items-center justify-between h-full w-full py-1">
+                            {playerImages[cell.playerName || ""] ? (
+                              <div className="h-[60%] sm:h-[65%] aspect-square relative mb-1 flex-shrink-0">
+                                <img 
+                                  src={playerImages[cell.playerName || ""]} 
+                                  alt={cell.playerName || ""} 
+                                  className="w-full h-full object-cover rounded-full border-2 border-slate-700/80 shadow-md select-none pointer-events-none"
+                                />
+                                <span className={`absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-black shadow-md border ${
+                                  cell.owner === 'X' 
+                                    ? 'bg-orange-500 text-white border-orange-400' 
+                                    : 'bg-blue-500 text-white border-blue-400'
+                                }`}>
+                                  {cell.owner}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="h-[60%] sm:h-[65%] aspect-square relative mb-1 flex-shrink-0">
+                                <div className="w-full h-full rounded-full border-2 border-slate-700/80 shadow-md flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                                  <span className="text-xs sm:text-sm font-bold text-slate-400">
+                                    {getInitials(cell.playerName || "")}
+                                  </span>
+                                </div>
+                                <span className={`absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-black shadow-md border ${
+                                  cell.owner === 'X' 
+                                    ? 'bg-orange-500 text-white border-orange-400' 
+                                    : 'bg-blue-500 text-white border-blue-400'
+                                }`}>
+                                  {cell.owner}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-[9px] min-[400px]:text-[10px] sm:text-xs md:text-sm font-bold text-center text-slate-200 leading-tight line-clamp-2 max-w-full px-1 drop-shadow-md">
                               {cell.playerName}
                             </span>
-                          </>
+                          </div>
                         )}
                         {!cell.owner && isPendingHere && pendingSelection && (
-                          <div className="opacity-60 w-full h-full absolute flex flex-col items-center justify-center pointer-events-none">
-                            <span className={`text-6xl sm:text-7xl md:text-8xl font-black absolute opacity-20 transform -translate-y-1 ${currentPlayer === 'X' ? 'text-orange-400' : 'text-blue-400'}`}>
-                              {currentPlayer}
-                            </span>
-                            <span className="z-10 text-[9px] min-[400px]:text-[11px] sm:text-xs md:text-sm font-extrabold text-center text-white break-words w-full px-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-tight">
+                          <div className="w-full h-full flex flex-col items-center justify-between py-1.5 opacity-60 pointer-events-none">
+                            {playerImages[pendingSelection.displayPlayer] ? (
+                              <div className="h-[60%] sm:h-[65%] aspect-square relative mb-1 flex-shrink-0">
+                                <img 
+                                  src={playerImages[pendingSelection.displayPlayer]} 
+                                  alt={pendingSelection.displayPlayer} 
+                                  className="w-full h-full object-cover rounded-full border-2 border-slate-500 shadow-md select-none"
+                                />
+                                <span className={`absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-black shadow-md border ${
+                                  currentPlayer === 'X' 
+                                    ? 'bg-orange-500 text-white border-orange-400' 
+                                    : 'bg-blue-500 text-white border-blue-400'
+                                }`}>
+                                  {currentPlayer}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="h-[60%] sm:h-[65%] aspect-square relative mb-1 flex-shrink-0">
+                                <div className="w-full h-full rounded-full border-2 border-slate-500 shadow-md flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                                  <span className="text-xs sm:text-sm font-bold text-slate-400">
+                                    {getInitials(pendingSelection.displayPlayer)}
+                                  </span>
+                                </div>
+                                <span className={`absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-black shadow-md border ${
+                                  currentPlayer === 'X' 
+                                    ? 'bg-orange-500 text-white border-orange-400' 
+                                    : 'bg-blue-500 text-white border-blue-400'
+                                }`}>
+                                  {currentPlayer}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-[9px] min-[400px]:text-[10px] sm:text-xs md:text-sm font-bold text-center text-slate-300 leading-tight line-clamp-2 max-w-full px-1 drop-shadow-md">
                               {pendingSelection.displayPlayer}
                             </span>
                           </div>
@@ -525,33 +608,45 @@ export default function Home() {
 
           {/* Search Area */}
           <div className="w-full max-w-sm flex flex-col relative flex-shrink-0">
-            <div className="h-16 w-full mb-2 relative">
+            <div className="min-h-16 w-full mb-3 flex items-center justify-center relative z-20">
               {errorMsg && (
-                 <div className="absolute top-0 w-full bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 rounded-xl text-sm font-medium shadow-lg shadow-red-500/10 animate-[bounce_0.5s_ease-in-out_2] backdrop-blur-md z-20 text-center">
-                   {errorMsg}
+                 <div className="w-full bg-red-600/20 border border-red-500 text-red-100 px-5 py-3 rounded-2xl text-base sm:text-lg font-bold shadow-[0_0_30px_rgba(239,68,68,0.3)] animate-[bounce_0.5s_ease-in-out_2] backdrop-blur-md text-center flex items-center justify-center gap-3">
+                   <svg className="w-6 h-6 sm:w-8 sm:h-8 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                   <span>{errorMsg}</span>
                  </div>
               )}
             </div>
 
             {/* Timer component above search bar */}
-            <div className="flex items-center justify-between px-5 py-3 mb-4 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-xl transition-all duration-300">
-              <div className="flex items-center gap-3">
-                <svg className={`w-5 h-5 ${timerActive ? 'text-red-500 animate-pulse' : 'text-slate-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-                  {timerActive ? "Tiempo Restante" : "Haz clic para iniciar"}
-                </span>
+            <div className={`relative overflow-hidden flex flex-col px-9 py-6 mb-8 bg-slate-900/80 backdrop-blur-md border rounded-[24px] shadow-xl transition-all duration-300 ${timerActive && timeLeft < 15 ? 'border-red-500/80 shadow-[0_0_30px_rgba(239,68,68,0.3)] animate-pulse' : 'border-slate-700/80'}`}>
+              <div className="flex items-center justify-between mb-3 z-10 relative">
+                <div className="flex items-center gap-4">
+                  <svg className={`w-9 h-9 ${timerActive && timeLeft < 15 ? 'text-red-500' : timerActive ? 'text-amber-500 animate-[spin_3s_linear_infinite]' : 'text-slate-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm sm:text-base font-black text-slate-300 tracking-widest uppercase">
+                    {timerActive ? (timeLeft < 15 ? "¡TIEMPO CRÍTICO!" : "TIEMPO RESTANTE") : "INICIAR JUEGO"}
+                  </span>
+                </div>
+                <div className={`text-6xl font-black font-mono tracking-tighter transition-colors duration-300 drop-shadow-md ${
+                  timerActive 
+                    ? timeLeft < 15 
+                      ? 'text-red-500' 
+                      : 'text-amber-400' 
+                    : 'text-slate-500'
+                }`}>
+                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                </div>
               </div>
-              <div className={`text-2xl font-black font-mono tracking-tight transition-colors duration-300 ${
-                timerActive 
-                  ? timeLeft < 20 
-                    ? 'text-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
-                    : 'bg-gradient-to-r from-amber-400 to-red-500 text-transparent bg-clip-text' 
-                  : 'text-slate-500'
-              }`}>
-                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-              </div>
+              {/* Progress bar background */}
+              {timerActive && (
+                <div className="w-full bg-slate-800 rounded-full h-3 mt-1 relative z-10 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ease-linear ${timeLeft < 15 ? 'bg-red-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`}
+                    style={{ width: `${(timeLeft / 90) * 100}%` }}
+                  ></div>
+                </div>
+              )}
             </div>
 
             <div className="relative group w-full mb-6 z-30">
@@ -601,17 +696,41 @@ export default function Home() {
               <svg className="w-5 h-5 group-hover:-rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
               REINICIAR PARTIDA
             </button>
+
+            {/* Ranking Placeholder */}
+            <div className="mt-8 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 shadow-xl w-full">
+              <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Ranking Global (Top 3)
+              </h3>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-bold text-amber-400">1</span>
+                    <span className="font-semibold text-slate-200">Futbolero99</span>
+                  </div>
+                  <span className="text-amber-500 font-bold text-sm">142 Victorias</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-bold text-slate-400">2</span>
+                    <span className="font-semibold text-slate-200">MessiFan</span>
+                  </div>
+                  <span className="text-slate-400 font-bold text-sm">128 Victorias</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-bold text-orange-400">3</span>
+                    <span className="font-semibold text-slate-200">LeyendaDT</span>
+                  </div>
+                  <span className="text-orange-400 font-bold text-sm">95 Victorias</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
       </div>
-
-      {/* Footer styled beautifully with glassmorphism matching the fixed header */}
-      <footer className="w-full bg-slate-950/90 backdrop-blur-lg py-6 border-t border-slate-800/80 flex flex-col items-center justify-center mt-auto shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-40">
-        <p className="text-slate-400 text-xs sm:text-sm font-medium tracking-wide text-center px-4">
-          Grid de Leyendas © {new Date().getFullYear()} — Desarrollado con pasión futbolera
-        </p>
-      </footer>
 
       {/* Custom Restart Modal matching the footer and website aesthetics */}
       {showRestartModal && (
@@ -646,6 +765,46 @@ export default function Home() {
                 className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 transition-all duration-200"
               >
                 SÍ, REINICIAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Clear Scores Modal matching website aesthetics */}
+      {showClearScoresModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-all duration-300">
+          <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl transform transition-all">
+            <div className="px-6 pt-8 pb-4 flex flex-col items-center">
+              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/30 mb-4 animate-[pulse_2s_ease-in-out_infinite]">
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-100 text-center">
+                ¿Reiniciar Marcador?
+              </h3>
+              <p className="text-slate-400 text-sm text-center mt-2 px-4 leading-relaxed">
+                ¿Estás seguro de que deseas borrar el historial de victorias acumuladas de X y O?
+              </p>
+            </div>
+            
+            <div className="p-6 bg-slate-950/90 border-t border-slate-800/80 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowClearScoresModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50 rounded-xl text-sm font-bold text-slate-300 hover:text-white transition-all duration-200"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={() => {
+                  setScores({ X: 0, O: 0 });
+                  localStorage.removeItem("grid-legends-scores");
+                  setShowClearScoresModal(false);
+                }}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all duration-200"
+              >
+                SÍ, LIMPIAR
               </button>
             </div>
           </div>
